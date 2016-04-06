@@ -65,6 +65,10 @@ func (server *Server) handleClient(client *Client) {
 			continue
 		}
 		message = strings.TrimRight(message, "\r\n")
+		if strings.Compare(strings.Split(message, " ")[0], "QUIT") == 0 {
+			delete(server.clients, client)
+			break
+		}
 		fmt.Println("Message:", string(message))
 		command := &Command{name: string(message), client: client, server: server}
 		server.command_chan <- command
@@ -137,6 +141,58 @@ func (command *Command) handleUserCommand(parameters []string) {
 	} else {
 		command.client.conn.Write([]byte("Invalid syntax\n"))
 	}
+}
+
+func (command *Command) handleNickCommand(parameters []string) {
+	if len(parameters) == 1 {
+
+		//nickname := parameters[0]
+		nickname := strings.TrimRight(parameters[0], "\r\n")
+		command.client.nickname = nickname
+		replyNickAndUserCommand(command.client, command.server)
+		fmt.Println("handleNickCommand")
+	} else {
+		command.client.conn.Write([]byte("Invalid syntax\n"))
+	}
+}
+
+func (command *Command) handleWhoCommand(parameters []string) {
+	if len(parameters) == 1 {
+		channel_name := strings.TrimRight(parameters[0][1:], "\r\n")
+		replyWhoCommand(command.client, command.server, channel_name)
+	}
+}
+
+func (command *Command) handlePrivateMessageCommand(parameters []string) {
+
+	if len(parameters) > 1 {
+		channel_name := strings.TrimRight(parameters[0][1:], "\r\n")
+		message := strings.TrimRight(parameters[1][1:], "\r\n")
+		for i := 2; i < len(parameters); i++ {
+			message = message + " " + parameters[i]
+		}
+		final_message := ""
+		channel := getChannelFromName(command.server, channel_name)
+		_, present := channel.clients[command.client]
+		if present {
+			for client, _ := range channel.clients {
+				if strings.Compare(command.client.nickname, client.nickname) != 0 {
+					final_message = fmt.Sprintf(":%s!%s@%s PRIVMSG #%s :%s",
+						command.client.nickname, command.client.username, client.hostname,
+						channel_name, message)
+					fmt.Println(final_message)
+					client.conn.Write([]byte(final_message + "\r\n"))
+				}
+			}
+		} else {
+			command.client.conn.Write([]byte("Not part of this channel\n"))
+		}
+	}
+
+}
+
+func (command *Command) handleInvalidCommand() {
+	command.client.conn.Write([]byte("Invalid commmand\n"))
 }
 
 func replyJoinCommand(client *Client, server *Server, channel_name string) {
@@ -228,58 +284,6 @@ func replyWhoCommand(client *Client, server *Server, channel_name string) {
 		client.nickname, channel_name)
 	fmt.Println("replyWhoCommand:", message)
 	client.conn.Write([]byte(message + "\r\n"))
-}
-
-func (command *Command) handleNickCommand(parameters []string) {
-	if len(parameters) == 1 {
-
-		//nickname := parameters[0]
-		nickname := strings.TrimRight(parameters[0], "\r\n")
-		command.client.nickname = nickname
-		replyNickAndUserCommand(command.client, command.server)
-		fmt.Println("handleNickCommand")
-	} else {
-		command.client.conn.Write([]byte("Invalid syntax\n"))
-	}
-}
-
-func (command *Command) handleWhoCommand(parameters []string) {
-	if len(parameters) == 1 {
-		channel_name := strings.TrimRight(parameters[0][1:], "\r\n")
-		replyWhoCommand(command.client, command.server, channel_name)
-	}
-}
-
-func (command *Command) handlePrivateMessageCommand(parameters []string) {
-
-	if len(parameters) > 1 {
-		channel_name := strings.TrimRight(parameters[0][1:], "\r\n")
-		message := strings.TrimRight(parameters[1][1:], "\r\n")
-		for i := 2; i < len(parameters); i++ {
-			message = message + " " + parameters[i]
-		}
-		final_message := ""
-		channel := getChannelFromName(command.server, channel_name)
-		_, present := channel.clients[command.client]
-		if present {
-			for client, _ := range channel.clients {
-				if strings.Compare(command.client.nickname, client.nickname) != 0 {
-					final_message = fmt.Sprintf(":%s!%s@%s PRIVMSG #%s :%s",
-						command.client.nickname, command.client.username, client.hostname,
-						channel_name, message)
-					fmt.Println(final_message)
-					client.conn.Write([]byte(final_message + "\r\n"))
-				}
-			}
-		} else {
-			command.client.conn.Write([]byte("Not part of this channel\n"))
-		}
-	}
-
-}
-
-func (command *Command) handleInvalidCommand() {
-	command.client.conn.Write([]byte("Invalid commmand\n"))
 }
 
 func getChannelFromName(server *Server, name string) *Channel {

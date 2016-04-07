@@ -20,6 +20,13 @@ const (
 	RPL_ENDOFNAMES_CODE string = "366"
 	USER_MODES          string = "aio"
 	CHANNEL_MODES       string = "beIikntPpTl"
+	JOIN_COMMAND        string = "JOIN"
+	MESSAGE_COMMAND     string = "MSG"
+	PART_COMMAND        string = "PART"
+	USER_COMMAND        string = "USER"
+	NICK_COMMNAND       string = "NICK"
+	WHO_COMMAND         string = "WHO"
+	PRIVMSG_COMMAND     string = "PRIVMSG"
 )
 
 type ClientMap map[*Client]bool
@@ -304,19 +311,19 @@ func parseCommand(command *Command) {
 		command_name := tokens[0]
 		parameters := tokens[1:]
 		switch strings.ToUpper(command_name) {
-		case "JOIN":
+		case JOIN_COMMAND:
 			command.handleJoinCommand(parameters)
-		case "MSG":
+		case MESSAGE_COMMAND:
 			command.handleMessageCommand(parameters)
-		case "PART":
+		case PART_COMMAND:
 			command.handlePartCommand(parameters)
-		case "USER":
+		case USER_COMMAND:
 			command.handleUserCommand(parameters)
-		case "NICK":
+		case NICK_COMMNAND:
 			command.handleNickCommand(parameters)
-		case "WHO":
+		case WHO_COMMAND:
 			command.handleWhoCommand(parameters)
-		case "PRIVMSG":
+		case PRIVMSG_COMMAND:
 			command.handlePrivateMessageCommand(parameters)
 		default:
 			command.handleInvalidCommand()

@@ -30,26 +30,25 @@ const (
 	SERVER_NAME         = "irc.example.com"
 )
 
-//type handleCommand func([]string)
-
 var clients = make(map[*Client]bool)
 var rooms = make(map[*Room]bool)
 
-/*const (
-	command_map = map[string]handleCommand{
-		"JOIN":    handleJoinCommand,
-		"MSG":     handleMessageCommand,
-		"PART":    handlePartCommand,
-		"USER":    handleUserCommand,
-		"NICK":    handleNickCommand,
-		"WHO":     handleWhoCommand,
-		"PRIVMSG": handlePrivateMessageCommand,
-	}
-)*/
+type handleCommand func([]string, *Command)
+
+var command_map = map[string]handleCommand{
+	"JOIN":    handleJoinCommand,
+	"MSG":     handleMessageCommand,
+	"PART":    handlePartCommand,
+	"USER":    handleUserCommand,
+	"NICK":    handleNickCommand,
+	"WHO":     handleWhoCommand,
+	"PRIVMSG": handlePrivateMessageCommand,
+}
 
 type Command struct {
-	name   string
-	client *Client
+	name              string
+	client            *Client
+	handleJoinCommand ([]string)
 }
 
 type Room struct {
@@ -74,7 +73,7 @@ type Client struct {
 	name            string
 }*/
 
-func (command *Command) handleJoinCommand(parameters []string) {
+func handleJoinCommand(parameters []string, command *Command) {
 
 	if len(parameters) == 0 {
 		return
@@ -93,7 +92,7 @@ func (command *Command) handleJoinCommand(parameters []string) {
 	replyJoinCommand(command.client, room)
 }
 
-func (command *Command) handleMessageCommand(parameters []string) {
+func handleMessageCommand(parameters []string, command *Command) {
 
 	if len(parameters) == 0 {
 		return
@@ -112,7 +111,7 @@ func (command *Command) handleMessageCommand(parameters []string) {
 	}
 }
 
-func (command *Command) handlePartCommand(parameters []string) {
+func handlePartCommand(parameters []string, command *Command) {
 	if len(parameters) == 0 {
 		return
 	}
@@ -131,7 +130,7 @@ func (command *Command) handlePartCommand(parameters []string) {
 	}
 }
 
-func (command *Command) handleUserCommand(parameters []string) {
+func handleUserCommand(parameters []string, command *Command) {
 
 	if len(parameters) != 4 {
 		command.client.conn.Write([]byte("Invalid syntax\n"))
@@ -148,7 +147,7 @@ func (command *Command) handleUserCommand(parameters []string) {
 	//replyNickAndUserCommand(command.client)
 }
 
-func (command *Command) handleNickCommand(parameters []string) {
+func handleNickCommand(parameters []string, command *Command) {
 
 	if len(parameters) != 1 {
 		command.client.conn.Write([]byte("Invalid syntax\n"))
@@ -161,7 +160,7 @@ func (command *Command) handleNickCommand(parameters []string) {
 	fmt.Println("handleNickCommand")
 }
 
-func (command *Command) handleWhoCommand(parameters []string) {
+func handleWhoCommand(parameters []string, command *Command) {
 
 	if len(parameters) != 1 {
 		return
@@ -171,7 +170,7 @@ func (command *Command) handleWhoCommand(parameters []string) {
 	replyWhoCommand(command.client, room_name)
 }
 
-func (command *Command) handlePrivateMessageCommand(parameters []string) {
+func handlePrivateMessageCommand(parameters []string, command *Command) {
 
 	if len(parameters) < 1 {
 		return
@@ -190,8 +189,8 @@ func (command *Command) handlePrivateMessageCommand(parameters []string) {
 			for client, _ := range room.clients {
 				if strings.Compare(command.client.nickname, client.nickname) != 0 {
 					final_message = fmt.Sprintf(":%s!%s@%s PRIVMSG #%s :%s",
-						command.client.nickname, command.client.username, command.client.hostname,
-						room_name, message)
+						command.client.nickname, command.client.username,
+						command.client.hostname, room_name, message)
 					fmt.Println(final_message)
 					client.conn.Write([]byte(final_message + "\r\n"))
 				}
@@ -210,7 +209,7 @@ func (command *Command) handlePrivateMessageCommand(parameters []string) {
 	}
 }
 
-func (command *Command) handleInvalidCommand() {
+func handleInvalidCommand(command *Command) {
 	command.client.conn.Write([]byte("Invalid commmand\n"))
 }
 
@@ -351,47 +350,16 @@ func parseCommand(command *Command) {
 	if len(tokens) >= 2 {
 		command_name := tokens[0]
 		parameters := tokens[1:]
-		/*handleFunc, ok := command_map[command_name]
+		handleFunc, ok := command_map[command_name]
 		if !ok {
-			command.handleInvalidCommand()
+			handleInvalidCommand(command)
 		} else {
-			command.handleFunc(parameters)
-		}*/
-		switch strings.ToUpper(command_name) {
-		case JOIN_COMMAND:
-			command.handleJoinCommand(parameters)
-		case MESSAGE_COMMAND:
-			command.handleMessageCommand(parameters)
-		case PART_COMMAND:
-			command.handlePartCommand(parameters)
-		case USER_COMMAND:
-			command.handleUserCommand(parameters)
-		case NICK_COMMNAND:
-			command.handleNickCommand(parameters)
-		case WHO_COMMAND:
-			command.handleWhoCommand(parameters)
-		case PRIVMSG_COMMAND:
-			command.handlePrivateMessageCommand(parameters)
-		default:
-			command.handleInvalidCommand()
+			handleFunc(parameters, command)
 		}
 	} else {
-		command.handleInvalidCommand()
+		handleInvalidCommand(command)
 	}
 }
-
-/*func (server *Server) run() {
-	for {
-		select {
-		case command := <-server.command_chan:
-			parseCommand(command)
-		case conn := <-server.connection_chan:
-			client := &Client{conn: conn, channels: make(map[*Channel]bool)}
-			server.clients[client] = true
-			go server.handleClient(client)
-		}
-	}
-}*/
 
 func main() {
 

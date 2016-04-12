@@ -176,29 +176,38 @@ func (command *Command) handlePrivateMessageCommand(parameters []string) {
 	if len(parameters) < 1 {
 		return
 	}
-
-	room_name := strings.TrimRight(parameters[0][1:], "\r\n")
 	message := strings.TrimRight(parameters[1][1:], "\r\n")
 	for i := 2; i < len(parameters); i++ {
 		message = message + " " + parameters[i]
 	}
-	final_message := ""
-	room := getRoomFromName(room_name)
-	_, present := room.clients[command.client]
-	if present {
-		for client, _ := range room.clients {
-			if strings.Compare(command.client.nickname, client.nickname) != 0 {
-				final_message = fmt.Sprintf(":%s!%s@%s PRIVMSG #%s :%s",
-					command.client.nickname, command.client.username, client.hostname,
-					room_name, message)
-				fmt.Println(final_message)
-				client.conn.Write([]byte(final_message + "\r\n"))
+	if parameters[0][0] == '#' {
+		// Message to room
+		room_name := strings.TrimRight(parameters[0][1:], "\r\n")
+		final_message := ""
+		room := getRoomFromName(room_name)
+		_, present := room.clients[command.client]
+		if present {
+			for client, _ := range room.clients {
+				if strings.Compare(command.client.nickname, client.nickname) != 0 {
+					final_message = fmt.Sprintf(":%s!%s@%s PRIVMSG #%s :%s",
+						command.client.nickname, command.client.username, command.client.hostname,
+						room_name, message)
+					fmt.Println(final_message)
+					client.conn.Write([]byte(final_message + "\r\n"))
+				}
 			}
+		} else {
+			command.client.conn.Write([]byte("Not part of this channel\n"))
 		}
 	} else {
-		command.client.conn.Write([]byte("Not part of this channel\n"))
+		// Message to User
+		client_name := parameters[0]
+		client := getClientFromName(client_name)
+		message = fmt.Sprintf(":%s!%s@%s PRIVMSG %s :%s", command.client.nickname,
+			command.client.username, command.client.hostname, client_name, message)
+		fmt.Println(message)
+		client.conn.Write([]byte(message + "\r\n"))
 	}
-
 }
 
 func (command *Command) handleInvalidCommand() {
@@ -300,6 +309,16 @@ func getRoomFromName(name string) *Room {
 		room.name = strings.TrimRight(room.name, "\r\n")
 		if room.name == name {
 			return room
+		}
+	}
+	return nil
+}
+
+func getClientFromName(name string) *Client {
+	for client, _ := range clients {
+		client.nickname = strings.TrimRight(client.nickname, "\r\n")
+		if client.nickname == name {
+			return client
 		}
 	}
 	return nil

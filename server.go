@@ -80,8 +80,7 @@ func handleJoinCommand(parameters []string, command *Command) {
 	if len(parameters) == 0 {
 		return
 	}
-
-	room_name := strings.TrimRight(parameters[0], "\r\n")
+	room_name := parameters[0]
 	if strings.ContainsAny(room_name, "#") {
 		room_name = room_name[1:]
 	}
@@ -120,7 +119,7 @@ func handlePartCommand(parameters []string, command *Command) {
 		return
 	}
 
-	room_name := strings.TrimRight(parameters[0][1:], "\r\n")
+	room_name := parameters[0][1:]
 	room := getRoomFromName(room_name)
 	if room != nil {
 		message := fmt.Sprintf(":%s!%s@%s PART #%s :%s", command.client.nickname,
@@ -158,7 +157,7 @@ func handleNickCommand(parameters []string, command *Command) {
 		return
 	}
 
-	nickname := strings.TrimRight(parameters[0], "\r\n")
+	nickname := parameters[0]
 	command.client.nickname = nickname
 	replyNickAndUserCommand(command.client)
 	fmt.Println("handleNickCommand")
@@ -170,7 +169,7 @@ func handleWhoCommand(parameters []string, command *Command) {
 		return
 	}
 
-	room_name := strings.TrimRight(parameters[0][1:], "\r\n")
+	room_name := parameters[0][1:]
 	replyWhoCommand(command.client, room_name)
 }
 
@@ -179,13 +178,13 @@ func handlePrivateMessageCommand(parameters []string, command *Command) {
 	if len(parameters) < 1 {
 		return
 	}
-	message := strings.TrimRight(parameters[1][1:], "\r\n")
+	message := parameters[1][1:]
 	for i := 2; i < len(parameters); i++ {
 		message = message + " " + parameters[i]
 	}
 	if parameters[0][0] == '#' {
 		// Message to room
-		room_name := strings.TrimRight(parameters[0][1:], "\r\n")
+		room_name := parameters[0][1:]
 		final_message := ""
 		room := getRoomFromName(room_name)
 		_, present := room.clients[command.client]
@@ -309,7 +308,6 @@ func replyWhoCommand(client *Client, room_name string) {
 
 func getRoomFromName(name string) *Room {
 	for room, _ := range rooms {
-		room.name = strings.TrimRight(room.name, "\r\n")
 		if room.name == name {
 			return room
 		}
@@ -319,7 +317,6 @@ func getRoomFromName(name string) *Room {
 
 func getClientFromName(name string) *Client {
 	for client, _ := range clients {
-		client.nickname = strings.TrimRight(client.nickname, "\r\n")
 		if client.nickname == name {
 			return client
 		}
@@ -369,8 +366,6 @@ func parseCommand(command *Command) {
 
 func main() {
 
-	// listen
-	//server := &Server{}
 	command_chan := make(chan *Command)
 	connection_chan := make(chan net.Conn)
 	args := os.Args[1:]

@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"sync"
 )
 
 const (
@@ -32,6 +33,7 @@ const (
 
 var clients = make(map[*Client]bool)
 var rooms = make(map[*Room]bool)
+var mutex = &sync.Mutex{}
 
 type handleCommand func([]string, *Command)
 
@@ -88,7 +90,9 @@ func handleJoinCommand(parameters []string, command *Command) {
 		room = &Room{name: room_name, clients: make(map[*Client]bool)}
 	}
 	room.clients[command.client] = true
+	mutex.Lock()
 	rooms[room] = true
+	mutex.Unlock()
 	replyJoinCommand(command.client, room)
 }
 
@@ -333,7 +337,9 @@ func handleClient(client *Client, command_chan chan *Command) {
 		}
 		message = strings.TrimRight(message, "\r\n")
 		if strings.Compare(strings.Split(message, " ")[0], "QUIT") == 0 {
+			mutex.Lock()
 			delete(clients, client)
+			mutex.Unlock()
 			break
 		}
 		fmt.Println("Message:", string(message))
@@ -389,10 +395,12 @@ func main() {
 	for {
 		select {
 		case command := <-command_chan:
-			parseCommand(command)
+			go parseCommand(command)
 		case conn := <-connection_chan:
 			client := &Client{conn: conn, rooms: make(map[*Room]bool)}
+			mutex.Lock()
 			clients[client] = true
+			mutex.Unlock()
 			go handleClient(client, command_chan)
 		}
 	}

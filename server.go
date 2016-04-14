@@ -168,28 +168,32 @@ func handlePrivateMessageCommand(parameters []string, command *Command) {
 		room_name := parameters[0][1:]
 		final_message := ""
 		room := getRoomFromName(room_name)
-		_, present := room.clients[command.client]
-		if present {
-			for client, _ := range room.clients {
-				if strings.Compare(command.client.nickname, client.nickname) != 0 {
-					final_message = fmt.Sprintf(":%s!%s@%s PRIVMSG #%s :%s",
-						command.client.nickname, command.client.username,
-						command.client.hostname, room_name, message)
-					fmt.Println(final_message)
-					client.conn.Write([]byte(final_message + CRLF))
+		if room != nil {
+			_, present := room.clients[command.client]
+			if present {
+				for client, _ := range room.clients {
+					if strings.Compare(command.client.nickname, client.nickname) != 0 {
+						final_message = fmt.Sprintf(":%s!%s@%s PRIVMSG #%s :%s",
+							command.client.nickname, command.client.username,
+							command.client.hostname, room_name, message)
+						fmt.Println(final_message)
+						client.conn.Write([]byte(final_message + CRLF))
+					}
 				}
+			} else {
+				command.client.conn.Write([]byte("Not part of this channel\n"))
 			}
-		} else {
-			command.client.conn.Write([]byte("Not part of this channel\n"))
 		}
 	} else {
 		// Message to User
 		client_name := parameters[0]
 		client := getClientFromName(client_name)
-		message = fmt.Sprintf(":%s!%s@%s PRIVMSG %s :%s", command.client.nickname,
-			command.client.username, command.client.hostname, client_name, message)
-		fmt.Println(message)
-		client.conn.Write([]byte(message + CRLF))
+		if client != nil {
+			message = fmt.Sprintf(":%s!%s@%s PRIVMSG %s :%s", command.client.nickname,
+				command.client.username, command.client.hostname, client_name, message)
+			fmt.Println(message)
+			client.conn.Write([]byte(message + CRLF))
+		}
 	}
 }
 

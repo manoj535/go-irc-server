@@ -40,7 +40,6 @@ type handleCommand func([]string, *Command)
 
 var command_map = map[string]handleCommand{
 	"JOIN":    handleJoinCommand,
-	"MSG":     handleMessageCommand,
 	"PART":    handlePartCommand,
 	"USER":    handleUserCommand,
 	"NICK":    handleNickCommand,
@@ -94,25 +93,6 @@ func handleJoinCommand(parameters []string, command *Command) {
 	rooms[room] = true
 	mutex.Unlock()
 	replyJoinCommand(command.client, room)
-}
-
-func handleMessageCommand(parameters []string, command *Command) {
-
-	if len(parameters) == 0 {
-		return
-	}
-
-	room_name := parameters[0]
-	message := parameters[1]
-	room := getRoomFromName(room_name)
-	_, present := room.clients[command.client]
-	if present {
-		for client, _ := range room.clients {
-			client.conn.Write([]byte(message + "\n"))
-		}
-	} else {
-		command.client.conn.Write([]byte("Not part of this channel\n"))
-	}
 }
 
 func handlePartCommand(parameters []string, command *Command) {

@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 )
 
 const (
@@ -15,6 +16,7 @@ const (
 	RPL_CREATED_CODE    = "003"
 	RPL_MYINFO_CODE     = "004"
 	ERR_NOMOTD_CODE     = "422"
+	ERR_NICKNAMEINUSE   = "433"
 	RPL_WHOREPLY_CODE   = "352"
 	RPL_ENDOFWHO_CODE   = "315"
 	RPL_NAMREPLY_CODE   = "353"
@@ -139,9 +141,17 @@ func handleNickCommand(parameters []string, command *Command) {
 	}
 
 	nickname := parameters[0]
-	command.client.nickname = nickname
-	replyNickAndUserCommand(command.client)
+	client_test := getClientFromName(nickname)
+	if client_test == nil {
+		command.client.nickname = nickname
+		replyNickAndUserCommand(command.client)
+	} else {
+		message := fmt.Sprintf(":%s %s * %s :Nickname is already in use", SERVER_NAME,
+			ERR_NICKNAMEINUSE, nickname)
+		command.client.conn.Write([]byte(message + CRLF))
+	}
 	fmt.Println("handleNickCommand")
+
 }
 
 func handleWhoCommand(parameters []string, command *Command) {
@@ -310,9 +320,21 @@ func getClientFromName(name string) *Client {
 	return nil
 }
 
+func sendPingCommand(client *Client) {
+	for {
+		time.Sleep(1000 * time.Millisecond)
+		fmt.Println("PING :" + SERVER_NAME)
+		client.conn.Write([]byte("PING :" + SERVER_NAME))
+		/*reader_obj := bufio.NewReader(client.conn)
+		message, _ := reader_obj.ReadString('\n')
+		fmt.Println("sendPingCommand:" + string(message))*/
+	}
+}
+
 func handleClient(client *Client, command_chan chan *Command) {
 
 	reader_obj := bufio.NewReader(client.conn)
+	//go sendPingCommand(client)
 	for {
 		message, _ := reader_obj.ReadString('\n')
 		if len(message) == 0 {
@@ -355,11 +377,11 @@ func main() {
 	command_chan := make(chan *Command)
 	connection_chan := make(chan net.Conn)
 	args := os.Args[1:]
-	if len(args) != 1 {
-		fmt.Println("Invalid args")
-		return
+	port := ":6667"
+	if len(args) == 1 {
+		port = ":" + args[0]
 	}
-	port := ":" + args[0]
+
 	ln, _ := net.Listen("tcp", port)
 	defer ln.Close()
 	go func() {

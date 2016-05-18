@@ -11,27 +11,27 @@ import (
 )
 
 const (
-	RPL_WELCOME_CODE    = "001"
-	RPL_YOURHOST_CODE   = "002"
-	RPL_CREATED_CODE    = "003"
-	RPL_MYINFO_CODE     = "004"
-	ERR_NOMOTD_CODE     = "422"
-	ERR_NICKNAMEINUSE   = "433"
-	RPL_WHOREPLY_CODE   = "352"
-	RPL_ENDOFWHO_CODE   = "315"
-	RPL_NAMREPLY_CODE   = "353"
-	RPL_ENDOFNAMES_CODE = "366"
-	USER_MODES          = "aio"
-	CHANNEL_MODES       = "beIikntPpTl"
-	JOIN_COMMAND        = "JOIN"
-	MESSAGE_COMMAND     = "MSG"
-	PART_COMMAND        = "PART"
-	USER_COMMAND        = "USER"
-	NICK_COMMNAND       = "NICK"
-	WHO_COMMAND         = "WHO"
-	PRIVMSG_COMMAND     = "PRIVMSG"
-	SERVER_NAME         = "irc.example.com"
-	CRLF                = "\r\n"
+	rplWelcomeCode    = "001"
+	rplYourHostCode   = "002"
+	rplCreatedCode    = "003"
+	rplMyinfoCode     = "004"
+	errNoMotdCode     = "422"
+	errNicknameInUse  = "433"
+	rplWhoReplyCode   = "352"
+	rplEndOfWhoCode   = "315"
+	rplNamReplyCode   = "353"
+	rplEndOfNamesCode = "366"
+	userModes         = "aio"
+	channelModes      = "beIikntPpTl"
+	joinCommand       = "JOIN"
+	messageCommand    = "MSG"
+	partCommand       = "PART"
+	userCommand       = "USER"
+	nickCommand       = "NICK"
+	whoCommand        = "WHO"
+	privMsgCommand    = "PRIVMSG"
+	serverName        = "irc.example.com"
+	crlf              = "\r\n"
 )
 
 var clients = make(map[*Client]bool)
@@ -40,7 +40,7 @@ var mutex = &sync.Mutex{}
 
 type handleCommand func([]string, *Command)
 
-var command_map = map[string]handleCommand{
+var commandMap = map[string]handleCommand{
 	"JOIN":    handleJoinCommand,
 	"PART":    handlePartCommand,
 	"USER":    handleUserCommand,
@@ -72,8 +72,8 @@ type Client struct {
 /*type Server struct {
 	clients         map[*Client]bool
 	channels        map[*Channel]bool
-	command_chan    chan *Command
-	connection_chan chan net.Conn
+	commandChan    chan *Command
+	connectionChan chan net.Conn
 	name            string
 }*/
 
@@ -82,13 +82,13 @@ func handleJoinCommand(parameters []string, command *Command) {
 	if len(parameters) == 0 {
 		return
 	}
-	room_name := parameters[0]
-	if strings.ContainsAny(room_name, "#") {
-		room_name = room_name[1:]
+	roomName := parameters[0]
+	if strings.ContainsAny(roomName, "#") {
+		roomName = roomName[1:]
 	}
-	room := getRoomFromName(room_name)
+	room := getRoomFromName(roomName)
 	if room == nil {
-		room = &Room{name: room_name, clients: make(map[*Client]bool)}
+		room = &Room{name: roomName, clients: make(map[*Client]bool)}
 	}
 	room.clients[command.client] = true
 	mutex.Lock()
@@ -102,15 +102,15 @@ func handlePartCommand(parameters []string, command *Command) {
 		return
 	}
 
-	room_name := parameters[0][1:]
-	room := getRoomFromName(room_name)
+	roomName := parameters[0][1:]
+	room := getRoomFromName(roomName)
 	if room != nil {
 		message := fmt.Sprintf(":%s!%s@%s PART #%s :%s", command.client.nickname,
-			command.client.username, command.client.hostname, room_name,
+			command.client.username, command.client.hostname, roomName,
 			command.client.nickname)
-		for room_client, _ := range room.clients {
+		for roomClient := range room.clients {
 			fmt.Println(message)
-			room_client.conn.Write([]byte(message + "\r\n"))
+			roomClient.conn.Write([]byte(message + "\r\n"))
 		}
 		delete(room.clients, command.client)
 	}
@@ -141,14 +141,14 @@ func handleNickCommand(parameters []string, command *Command) {
 	}
 
 	nickname := parameters[0]
-	client_test := getClientFromName(nickname)
-	if client_test == nil {
+	clientTest := getClientFromName(nickname)
+	if clientTest == nil {
 		command.client.nickname = nickname
 		replyNickAndUserCommand(command.client)
 	} else {
-		message := fmt.Sprintf(":%s %s * %s :Nickname is already in use", SERVER_NAME,
-			ERR_NICKNAMEINUSE, nickname)
-		command.client.conn.Write([]byte(message + CRLF))
+		message := fmt.Sprintf(":%s %s * %s :Nickname is already in use", serverName,
+			errNicknameInUse, nickname)
+		command.client.conn.Write([]byte(message + crlf))
 	}
 	fmt.Println("handleNickCommand")
 
@@ -160,8 +160,8 @@ func handleWhoCommand(parameters []string, command *Command) {
 		return
 	}
 
-	room_name := parameters[0][1:]
-	replyWhoCommand(command.client, room_name)
+	roomName := parameters[0][1:]
+	replyWhoCommand(command.client, roomName)
 }
 
 func handlePrivateMessageCommand(parameters []string, command *Command) {
@@ -175,19 +175,19 @@ func handlePrivateMessageCommand(parameters []string, command *Command) {
 	}
 	if parameters[0][0] == '#' {
 		// Message to room
-		room_name := parameters[0][1:]
-		final_message := ""
-		room := getRoomFromName(room_name)
+		roomName := parameters[0][1:]
+		finalMessage := ""
+		room := getRoomFromName(roomName)
 		if room != nil {
 			_, present := room.clients[command.client]
 			if present {
-				for client, _ := range room.clients {
+				for client := range room.clients {
 					if strings.Compare(command.client.nickname, client.nickname) != 0 {
-						final_message = fmt.Sprintf(":%s!%s@%s PRIVMSG #%s :%s",
+						finalMessage = fmt.Sprintf(":%s!%s@%s PRIVMSG #%s :%s",
 							command.client.nickname, command.client.username,
-							command.client.hostname, room_name, message)
-						fmt.Println(final_message)
-						client.conn.Write([]byte(final_message + CRLF))
+							command.client.hostname, roomName, message)
+						fmt.Println(finalMessage)
+						client.conn.Write([]byte(finalMessage + crlf))
 					}
 				}
 			} else {
@@ -196,13 +196,13 @@ func handlePrivateMessageCommand(parameters []string, command *Command) {
 		}
 	} else {
 		// Message to User
-		client_name := parameters[0]
-		client := getClientFromName(client_name)
+		clientName := parameters[0]
+		client := getClientFromName(clientName)
 		if client != nil {
 			message = fmt.Sprintf(":%s!%s@%s PRIVMSG %s :%s", command.client.nickname,
-				command.client.username, command.client.hostname, client_name, message)
+				command.client.username, command.client.hostname, clientName, message)
 			fmt.Println(message)
-			client.conn.Write([]byte(message + CRLF))
+			client.conn.Write([]byte(message + crlf))
 		}
 	}
 }
@@ -215,29 +215,29 @@ func replyJoinCommand(client *Client, room *Room) {
 
 	message := ""
 	//client.nickname = "manoj"
-	for room_client, _ := range room.clients {
+	for roomClient := range room.clients {
 		message = fmt.Sprintf(":%s!%s@%s %s #%s", client.nickname, client.username,
 			client.hostname, "JOIN", room.name)
 		fmt.Println(message)
-		room_client.conn.Write([]byte(message + CRLF))
+		roomClient.conn.Write([]byte(message + crlf))
 	}
 
 	//message = fmt.Sprintf("%s %s #%s :%s", ":127.0.0.1", "332", channel_name, "test topic")
-	//client.conn.Write([]byte(message + CRLF))
+	//client.conn.Write([]byte(message + crlf))
 	//message = fmt.Sprintf("%s %s %s = #%s :@%s", ":127.0.0.1", "353", client.nickname, channel_name, client.nickname)
-	message = fmt.Sprintf(":%s %s %s = #%s :@", SERVER_NAME, RPL_NAMREPLY_CODE,
+	message = fmt.Sprintf(":%s %s %s = #%s :@", serverName, rplNamReplyCode,
 		client.nickname, room.name)
 
-	for room_client, _ := range room.clients {
-		message = message + room_client.nickname + " "
+	for roomClient := range room.clients {
+		message = message + roomClient.nickname + " "
 	}
 	message = strings.TrimRight(message, " ")
 	fmt.Println(message)
-	client.conn.Write([]byte(message + CRLF))
-	message = fmt.Sprintf(":%s %s %s #%s :%s", SERVER_NAME, RPL_ENDOFNAMES_CODE,
+	client.conn.Write([]byte(message + crlf))
+	message = fmt.Sprintf(":%s %s %s #%s :%s", serverName, rplEndOfNamesCode,
 		client.nickname, room.name, "End of NAMES list")
 	fmt.Println(message)
-	client.conn.Write([]byte(message + CRLF))
+	client.conn.Write([]byte(message + crlf))
 
 }
 
@@ -251,59 +251,59 @@ func replyNickAndUserCommand(client *Client) {
 	}
 	//nick = "manoj"
 	// send RPL_WELCOME
-	message := fmt.Sprintf(":%s %s %s %s", SERVER_NAME, RPL_WELCOME_CODE,
+	message := fmt.Sprintf(":%s %s %s %s", serverName, rplWelcomeCode,
 		nick, ":Welcome to the Internet Relay Network ")
 	fmt.Println("replyNickandUserCommand:", message)
-	client.conn.Write([]byte(message + CRLF))
+	client.conn.Write([]byte(message + crlf))
 	// send RPL_YOURHOST
-	message = fmt.Sprintf(":%s %s %s %s", SERVER_NAME, RPL_YOURHOST_CODE,
+	message = fmt.Sprintf(":%s %s %s %s", serverName, rplYourHostCode,
 		nick, ":Your host is irc.example.com")
 	fmt.Println("replyNickandUserCommand:", message)
-	client.conn.Write([]byte(message + CRLF))
+	client.conn.Write([]byte(message + crlf))
 	// send RPL_CREATED
-	message = fmt.Sprintf(":%s %s %s %s", SERVER_NAME, RPL_CREATED_CODE,
+	message = fmt.Sprintf(":%s %s %s %s", serverName, rplCreatedCode,
 		nick, ":This server was created at")
 	fmt.Println("replyNickandUserCommand:", message)
-	client.conn.Write([]byte(message + CRLF))
+	client.conn.Write([]byte(message + crlf))
 	// send RPL_MYINFO
-	message = fmt.Sprintf(":%s %s %s %s %s %s %s", SERVER_NAME, RPL_MYINFO_CODE,
-		nick, "localhost", "1.0", USER_MODES, CHANNEL_MODES)
+	message = fmt.Sprintf(":%s %s %s %s %s %s %s", serverName, rplMyinfoCode,
+		nick, "localhost", "1.0", userModes, channelModes)
 	fmt.Println("replyNickandUserCommand:", message)
-	client.conn.Write([]byte(message + CRLF))
+	client.conn.Write([]byte(message + crlf))
 	// send ERR_NOMOTD
-	message = fmt.Sprintf(":%s %s %s %s", SERVER_NAME, ERR_NOMOTD_CODE,
+	message = fmt.Sprintf(":%s %s %s %s", serverName, errNoMotdCode,
 		nick, ":MOTD file is missing")
 	fmt.Println("replyNickandUserCommand:", message)
-	client.conn.Write([]byte(message + CRLF))
+	client.conn.Write([]byte(message + crlf))
 }
 
-func replyWhoCommand(client *Client, room_name string) {
+func replyWhoCommand(client *Client, roomName string) {
 	message := ""
-	room := getRoomFromName(room_name)
+	room := getRoomFromName(roomName)
 	isFirst := true
 	temp := ""
-	for client_in_room, _ := range room.clients {
+	for clientInRoom := range room.clients {
 		if isFirst {
 			isFirst = false
 			temp = "H@"
 		} else {
 			temp = "H"
 		}
-		message = fmt.Sprintf(":%s %s %s #%s %s %s %s %s %s :0 %s", SERVER_NAME,
-			RPL_WHOREPLY_CODE, client.nickname, room_name,
+		message = fmt.Sprintf(":%s %s %s #%s %s %s %s %s %s :0 %s", serverName,
+			rplWhoReplyCode, client.nickname, roomName,
 			client.username, client.hostname,
-			SERVER_NAME, client_in_room.nickname, temp, client.realname)
+			serverName, clientInRoom.nickname, temp, client.realname)
 		fmt.Println("replyWhoCommand:", message)
-		client.conn.Write([]byte(message + CRLF))
+		client.conn.Write([]byte(message + crlf))
 	}
-	message = fmt.Sprintf(":%s %s %s #%s :End of WHO list", SERVER_NAME, RPL_ENDOFWHO_CODE,
-		client.nickname, room_name)
+	message = fmt.Sprintf(":%s %s %s #%s :End of WHO list", serverName, rplEndOfWhoCode,
+		client.nickname, roomName)
 	fmt.Println("replyWhoCommand:", message)
-	client.conn.Write([]byte(message + CRLF))
+	client.conn.Write([]byte(message + crlf))
 }
 
 func getRoomFromName(name string) *Room {
-	for room, _ := range rooms {
+	for room := range rooms {
 		if room.name == name {
 			return room
 		}
@@ -312,7 +312,7 @@ func getRoomFromName(name string) *Room {
 }
 
 func getClientFromName(name string) *Client {
-	for client, _ := range clients {
+	for client := range clients {
 		if client.nickname == name {
 			return client
 		}
@@ -323,24 +323,24 @@ func getClientFromName(name string) *Client {
 func sendPingCommand(client *Client) {
 	for {
 		time.Sleep(1000 * time.Millisecond)
-		fmt.Println("PING :" + SERVER_NAME)
-		client.conn.Write([]byte("PING :" + SERVER_NAME))
-		/*reader_obj := bufio.NewReader(client.conn)
-		message, _ := reader_obj.ReadString('\n')
+		fmt.Println("PING :" + serverName)
+		client.conn.Write([]byte("PING :" + serverName))
+		/*readerObj := bufio.NewReader(client.conn)
+		message, _ := readerObj.ReadString('\n')
 		fmt.Println("sendPingCommand:" + string(message))*/
 	}
 }
 
-func handleClient(client *Client, command_chan chan *Command) {
+func handleClient(client *Client, commandChan chan *Command) {
 
-	reader_obj := bufio.NewReader(client.conn)
+	readerObj := bufio.NewReader(client.conn)
 	//go sendPingCommand(client)
 	for {
-		message, _ := reader_obj.ReadString('\n')
+		message, _ := readerObj.ReadString('\n')
 		if len(message) == 0 {
 			continue
 		}
-		message = strings.TrimRight(message, CRLF)
+		message = strings.TrimRight(message, crlf)
 		if strings.Compare(strings.Split(message, " ")[0], "QUIT") == 0 {
 			mutex.Lock()
 			delete(clients, client)
@@ -349,7 +349,7 @@ func handleClient(client *Client, command_chan chan *Command) {
 		}
 		fmt.Println("Message:", string(message))
 		command := &Command{name: string(message), client: client}
-		command_chan <- command
+		commandChan <- command
 	}
 
 }
@@ -359,9 +359,9 @@ func parseCommand(command *Command) {
 	tokens := strings.Split(command.name, " ")
 
 	if len(tokens) >= 2 {
-		command_name := tokens[0]
+		commandName := tokens[0]
 		parameters := tokens[1:]
-		handleFunc, ok := command_map[command_name]
+		handleFunc, ok := commandMap[commandName]
 		if !ok {
 			handleInvalidCommand(command)
 		} else {
@@ -374,8 +374,8 @@ func parseCommand(command *Command) {
 
 func main() {
 
-	command_chan := make(chan *Command)
-	connection_chan := make(chan net.Conn)
+	commandChan := make(chan *Command)
+	connectionChan := make(chan net.Conn)
 	args := os.Args[1:]
 	port := ":6667"
 	if len(args) == 1 {
@@ -391,20 +391,20 @@ func main() {
 				continue
 			}
 			fmt.Println("accepted new connection")
-			connection_chan <- conn
+			connectionChan <- conn
 		}
 	}()
 	//server.run()
 	for {
 		select {
-		case command := <-command_chan:
+		case command := <-commandChan:
 			go parseCommand(command)
-		case conn := <-connection_chan:
+		case conn := <-connectionChan:
 			client := &Client{conn: conn, rooms: make(map[*Room]bool)}
 			mutex.Lock()
 			clients[client] = true
 			mutex.Unlock()
-			go handleClient(client, command_chan)
+			go handleClient(client, commandChan)
 		}
 	}
 }
